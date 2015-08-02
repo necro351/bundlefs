@@ -1,0 +1,121 @@
+Abstract
+--------
+
+BundleFS is a stacking file system that exposes a transactional git-like file
+system interface to an underlying file system that needs to be tracked. The
+underlying file system need not support snapshots (writable or read-only),
+transactions, layering, unioning, or any other advanced features (e.g., Ext4),
+but by wrapping the filesystem with BundleFS, these features become available.
+Although writable snapshots and transactions are useful on their own, BundleFS
+uses these mechanisms as building blocks to implement support for bundles,
+which are self-contained directories of backup files that can be created with a
+git-diff like interface and can be used like patches to, e.g., provide
+incremental changes to a common file system state, store backups on a backup
+disk, or to merge and resolve conflicts with a larger encompassing distributed
+file system state.
+
+Intro
+-----
+
+Transactions in operating and distributed systems is still a largely open
+problem but even so isolation for complex processes has already come. VMs
+provide one level of isolation for entire operating systems while containers
+provide isolation for groups of processes within an operating system. Although
+mechanisms for achieving isolation are well supported and rapidly expanding in
+choice of level of granularity how work is performed, or how a commonly
+accepted data set is moved from one state forward to another, is more
+application specific. It is perfectly reasonable for a set of containers to
+modify a shared Cassandra database for example, but there is also a converse
+need for a more general approach that can be adopted with less development
+time, even if it means potentially worse performance to an application-specific
+optimized approach. A distributed file system would be such a general approach
+but how does one corral many different types of file systems, laptops,
+container volumes, shared networked volumes, each with different rates of
+churn, and manage all the conflicts that may arise as they all update
+potentially the same file? The common solution is partitioning for scale, and
+late resolution of conflicts for conflict management, i.e., something like git.
+However git does not handle large files well, and does not provide a file
+system interface. BundleFS addresses these issues and is designed explicitly to
+work out of the box with older local file systems while providing a larger
+distributed namespace that local file systems can remain oblivious to even as
+they participate in making changes to it. A good simplifying similie for
+BundleFS is that it allows small to large groups of people to track changes to
+all files as if they were in a large shared source control repository with
+commensurate features (provenance tracking, revision control, backup and
+restore, distribution of small incremental updates to shared files). It may
+also be helpful for understanding to point out one of the things BundleFS does
+_not_ do. It does not attempt to impose immediate and global consistency (e.g.,
+two or more users can freely modify the same file, just as in git, and will
+have to resolve the conflict the next time they directly or transitively sync
+with a common ancestor state, just as in git). In general BundleFS tries to
+make it very easy to understand, search, access, and manage the history of an
+organization's files across all its various file systems used by its users. It
+does _not_ attempt to create the illusion of a massive, single shared file
+system where all changes are immediately visible to all parties no matter where
+or with what quality of network connectivity they are made.
+
+Design
+------
+
+There are three components to BundleFS:
+
+(1) The stacking file system (which for performance reasons is an in-kernel
+stacking FS like eCryptFS based on wrapFS, not a FUSE FS, though it could be
+ported to FUSE relatively easily). This is called BundleFS.
+
+(2) The revision control tools which are user-level tools that understand the
+bundle format used by BundleFS and can merge together and partition revision
+control graphs serialized in bundles created by BundleFS. The revision control
+tools are used to view and manage the combination of all bundles contributed by
+all users in an organization as they commit their changes to their local
+bundles and potentially overlapping files modified in other bundles as well.
+
+(3) The bundle on-disk format which is a simple archival format that can be
+understood by the standard command line tools and easily backed up, restored,
+transferred, and compressed by existing industry-grade storage solutions, or
+simpler solutions, e.g., rsync.
+
+BundleFS focuses by prioritizing features in this order:
+
+(1) Data protection: The stacking FS chooses to use more traditional
+undo-logging of files so that changes to BundleFS are almost always realized as
+changes to the underlying file system. This means that if BundleFS is
+unmounted, the underlying FS represents the current working HEAD state. This is
+intentional and represents BundleFS being committed to a policy of
+non-interference and keeping users as close to a working FS state as possible
+at all times if BundleFS is taken out of the equation. In the same vein, all of
+BundleFS's state is kept in a separate directory that can be unlinked,
+archived, or even hosted on a different partition or underlying FS. This policy
+of non-interference attempts to place the majority of the burden of data
+protection on the underlying FS implementation, which typically makes sense and
+is how BundleFS achieves most of its data protection.
+
+(2) Transparency: BundleFS's bundle format is easily understood by existing
+command line tools and new tools can be easily written to understand it as
+well. Furthermore since the bundles are just directories of files they can be
+moved around, checksummed, compressed, and distributed. The on-disk bundle
+format is always preserved and more efficient approaches are abandonned if they
+comprimise the simplicity of the bundle format.
+
+(3) Conflict Resolution: As much as possible conflict resolution is made
+transparent and handled out of path. Out of path because kernel code run by
+mmap is the wrong place to ask users how to handle conflicts in files.
+Transparent so that it is straight-forward to add application support for
+better support of conflict management, and ultimately, conflict management
+itself can be supported in more robust, perhaps even proprietary tools that
+make it easy for organizations to minimize, handle, and intelligently
+distribute conflict resolution.
+
+(4) Performance: When possible performance is achieved (e.g., by using a
+stackable FS instead of FUSE) but never at the expense of the above features.
+For example when making changes to a file shared by another branch the
+block-size used for faulting is 16MB so that the bundle format can use the
+directory/namespace structure of the underlying FS to index modified files and
+the indexes are visible to command line tools exploring the bundle format, even
+though the large block size means that many workloads will end up making
+complete copies of the shared snapshot or incurr large latencies. There are
+much more efficient ways of supporting faulting that would allow for very small
+block sizes, but these would require a more efficient and integrated indexing
+approach that would preclude simply using the underlying FS's
+directory/namespace structure and would require special command-line tools to
+browse the bundles.
