@@ -1,5 +1,5 @@
 Abstract
---------
+========
 
 BundleFS is a stacking file system that exposes a transactional git-like file
 system interface to an underlying file system that needs to be tracked. The
@@ -15,7 +15,7 @@ disk, or to merge and resolve conflicts with a larger encompassing distributed
 file system state.
 
 Intro
------
+=====
 
 Transactions in operating and distributed systems is still a largely open
 problem but even so isolation for complex processes has already come. VMs
@@ -55,7 +55,7 @@ system where all changes are immediately visible to all parties no matter where
 or with what quality of network connectivity they are made.
 
 Design
-------
+======
 
 There are three components to BundleFS:
 
@@ -109,13 +109,197 @@ distribute conflict resolution.
 (4) Performance: When possible performance is achieved (e.g., by using a
 stackable FS instead of FUSE) but never at the expense of the above features.
 For example when making changes to a file shared by another branch the
-block-size used for faulting is 16MB so that the bundle format can use the
-directory/namespace structure of the underlying FS to index modified files and
-the indexes are visible to command line tools exploring the bundle format, even
-though the large block size means that many workloads will end up making
+block-size used for faulting pieces is 16MB so that the bundle format can use
+the directory/namespace structure of the underlying FS to index modified files
+and the indexes are visible to command line tools exploring the bundle format,
+even though the large block size means that many workloads will end up making
 complete copies of the shared snapshot or incurr large latencies. There are
 much more efficient ways of supporting faulting that would allow for very small
 block sizes, but these would require a more efficient and integrated indexing
 approach that would preclude simply using the underlying FS's
 directory/namespace structure and would require special command-line tools to
 browse the bundles.
+
+Bundle Format
+-------------
+
+A bundle is a set of commits and an accompanying set of aliases (tags) that
+point to one or more of those commits. A bundle consists of at least a HEAD tag
+and then perhaps more tags beyond that. Like in git, a commit is comprised of a
+tree as well as a set of parent and a set of child commits. A tree is a
+hierarchical structure that is comprised of one or more absolute path to object
+or tree stub mappings. An object is a collection of faulted pieces or piece
+stubs. A tree stub is a reference to a tree, a piece stub is a reference to a
+piece. Stubs can be within a set or can be individually packed. For example a
+tree may use a stub to refer to several entries within a directory, these would
+be individually packed so that when the reference is followed the found items
+contribute to the set of items in the directory rather than creating a new
+sub-directory with the items in there.
+
+All sets of items are represented as directories of files in the underlying
+file system and all references are represented as simple files with the address
+to follow and the method by which to follow encoded as plain text in the simple
+file.
+
+Example Bundle:
+Manifest:
+bundles/i0/pieces
+bundles/i0/pieces/i0
+bundles/i0/pieces/i1
+bundles/i0/pieces/i2
+bundles/i0/pieces/i3
+bundles/i0/files/i0
+bundles/i0/trees
+bundles/i0/trees/i0
+bundles/i0/commit
+bundles/i0/commit/message
+bundles/i0/commit/root
+bundles/i0/commit/parents
+
+The 0th bundle only has one tree: bundles/0/trees/0. Since trees can contain
+the manifest of an arbitrary file-tree hierarchy only one tree is necessary in
+many cases. Since there is only one tree (in this simple example), the root
+must point to it:
+
+bundles/0/commit/root:
+0
+
+The tree tells us what object each path maps to in this binary format:
+<path-length><path><value-length><value>
+A value is a type and an ID value (each 8b uint64s).
+
+The format is interpreted in the example below so we can read it.
+
+bundles/0/trees/0:
+20,/home/rick/hello.tar.gz,16,{type: file, value: 0}
+
+In this case the file is quite large at a little under 64MB, so it is broken
+into four pieces. A file is represented with a file in the files sub-dir of the
+bundle and it merely lists each piece's ID one after the other in binary
+format. This is represented as a comma delimited list so we can read it.
+
+bundles/0/files/0:
+0,1,2,3
+
+Finally each of the pieces themselves are 16MB or less of data that was copied
+from the underlying file system. In this case every piece was modified in this
+commit.
+
+How BundleFS Creates Bundles
+----------------------------
+
+BundleFS does not use the snapshot metaphor but rather the version control
+metaphore. Users do not modify snapshots but rather modify branches. Their
+changes are staged as they are made and then are free to be asynchronously
+copied into place after commit. BundleFS creates a bundle as soon as a branch
+is created. Modifications to the branch are staged in the bundle. When the
+modifications are committed the bundle is closed and a new one is created. For
+simplicity we do not allow the user to commit an empty bundle.
+
+To see how a bundle is constructed piece-by-piece let us walk through an
+example. First the user creates a branch, this creates a mount point at
+/var/bundlefs/mnt/0. The branch is a clone of some other committed file system
+state. Next the user modifies /home/rick/hell.tar.gz by (let us suppose)
+running a transform program on it that rewrites the file with a one-time-pad.
+First the file is opened to perform the writes and this causes the tree file to
+fault in an entry indicating this file was modified in this bundle.
+Second the writes themselves are implemented by BundleFS by detecting that the
+four pieces the file is comprised of have not ever been modified (it implicitly
+knows this because the pieces have not already been faulted into the bundle) so
+it will have to fault each piece in and apply the write. A piece is faulted in
+by doing a read-modify-write: finding the piece the write modifies, copying it
+into the bundle, and applying the write to the copy in the bundle. This has
+performance implications that are ignored for simplicity at this point. It is
+worth noting that with robust file caching most of the repeated copying from
+doing faulting in this simple manner is done in memory, in the kernel, with
+memcpy, and does not incur additional IO on top of a more sophisticated
+log-structured small-block-size design. Once the write completes the bundle has
+a tree file, the file pointing at the pieces, and each of the (modified)
+pieces. The bundle is now almost completely formed, the final step will be when
+the user (or backup daemon perhaps) commits the changes and a commit message
+and list of parents will be created (in this case one parent only since this
+change was not the result of a merge).
+
+Merging in BundleFS
+-------------------
+
+Merging in BundleFS means creating a bundle that shows how to converge one or
+more branches into a single branch. This is the primary mechanism by which
+long-running transactions are ultimately committed. To see how merging is the
+same as committing a transaction lets look at a simple example.
+
+First we begin a transaction by cloning the branch we want to transactionally
+make changes to (it could be the HEAD or some other branch a group of processes
+are working on, e.g., a branch used by a container). This creates a private
+(only we know about it) and writable branch. We make all the changes we want to
+this branch and then commit them. At this point we have saved our desired
+changes, but have not yet managed to publish them. To publish our changes we
+must merge them back into the branch we want them to be visible from (e.g.,
+HEAD or a shared branch used by a group of processes or container). This means
+merging our private committed branch with the public branch. If there are no
+conflicts then files we modified are orthogonal to files modified by other
+transactions and the commit can proceed, otherwise a special conflict branch is
+created where conflicting files are stored side-by-side and the user is
+expected to remove one or the other (resolve conflicts) then mark the conflict
+branch as resolved, at which point it can be committed. A committed merge
+branch lists both the HEAD (or other branch) and the private branch as its
+parents. It is important to note that for true transactional isolation files
+are marked as read even if they are not modified, so that during a merge if one
+branch modifies a file that was only read by the other, it will still be
+registered as a conflict and must be explicitly acknowleged during conflict
+resolution as being OK (or not). Alternatively if the branch cannot be merged
+and the process performed is repeatable, the private branch can be discarded
+and a new one can be formed by cloning the more recent HEAD. This is analagous
+to a traditional transactional system forcing an abort on one of the processes.
+
+Up/Downloading, Mounting, and Moving Bundles
+--------------------------------------------
+
+Bundles are a great way to package large changes made to a file system and can
+be easiliy created by mounting BundleFS on top of a file system and making
+changes to it. A bundle is 1:1 with a commit or state transition from one point
+in the revision graph to the next. Containers and package management systems
+work by mirroring a shallow tree of file system states that clients can run. It
+would be sensible to represent the root state (perhaps a bare-bones ubuntu
+image) as a root bundle (a single commit) and then represent children that
+inherit from this image as subsequent bundles where each lists the root bundle
+as its parent. Then a package distributer can host the base root bundle, and
+then optional branch bundles that are based on the root. Each of these bundles
+can be downloaded separately and then cloned and mounted.
+
+If a bundle is going to be uploaded it makes sense to hash its contents and
+compute the hash of the root of the Merkel tree. This process is delayed since
+bundles are so much larger than source control repositories but it can be
+performed. To Merkel-ify a bundle the hashes of all objects are computed and
+are used as the identifier and the prefixing 'i' is stripped. The name of the
+bundle becomes the hash of the root of the Merkel tree. Duplicate objects (if
+there are any) are deduplicated. To download and mount a bundle merely unpack
+the bundle in /var/bundlefs/bundles and a new directory named after the
+bundle's SHA1 is created. At this point if the bundle's dependencies (in
+parents) also exist the bundle can be treated like any other branch and can be
+cloned and mounted.
+
+Since bundles are just tar archives they can be mirrored, copied, hosted,
+uploaded, downloaded, archived, and stored like any simple file.
+
+Performance Optimizations
+-------------------------
+
+BundleFS is acceptable for many workloads (those that only modify smaller
+files, create mostly new files, or sequentially append to existing files) but
+for many other workloads (those that randomly update large files) the vast
+majority of IO is spent on write amplification (due to the 16MB piece-size).
+This can be potentially mitigated with a Bundle 2.0 spec where a smaller
+block-size is supported (e.g., 4--16KB) and indexing is implemented using an
+index stored in, e.g., LevelDB, instead of as simple names in directories.
+Compaction would become a requirement as well at this point as randomly reading
+4KB or 16KB can be much less efficient than 16MB pieces. These optimizations
+drastically increase the complexity of BundleFS but only make some workloads
+more efficient where as the much simple design above allows for all of
+BundleFS's features to be used immediately. So we are simply stating that we
+made a conscious decision to use a simple more rapidly implemented design while
+leaving the door open to a more sophisticated on-disk format and file system
+that can be more efficient for more random-access workloads.
+
+Implementation
+==============
