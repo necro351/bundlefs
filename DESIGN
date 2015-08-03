@@ -11,8 +11,9 @@ uses these mechanisms as building blocks to implement support for bundles,
 which are self-contained directories of backup files that can be created with a
 git-diff like interface and can be used like patches to, e.g., provide
 incremental changes to a common file system state, store backups on a backup
-disk, or to merge and resolve conflicts with a larger encompassing distributed
-file system state.
+disk, consistently migrate file system state from one host to another, or to
+merge and resolve conflicts with a larger encompassing distributed file system
+state.
 
 Intro
 =====
@@ -128,13 +129,14 @@ point to one or more of those commits. A bundle consists of at least a HEAD tag
 and then perhaps more tags beyond that. Like in git, a commit is comprised of a
 tree as well as a set of parent and a set of child commits. A tree is a
 hierarchical structure that is comprised of one or more absolute path to object
-or tree stub mappings. An object is a collection of faulted pieces or piece
-stubs. A tree stub is a reference to a tree, a piece stub is a reference to a
-piece. Stubs can be within a set or can be individually packed. For example a
-tree may use a stub to refer to several entries within a directory, these would
-be individually packed so that when the reference is followed the found items
-contribute to the set of items in the directory rather than creating a new
-sub-directory with the items in there.
+or stub mappings. An object is a collection of faulted pieces or piece stubs. A
+stub is a reference to data that may not be accessible locally and a hash is
+provided in its place so the proper Merkel-ification can be computed
+regardless. Stubs can be within a set or can be individually packed. For
+example a tree may use a stub to refer to several entries within a directory,
+these would be individually packed so that when (if) the stub is expanded the
+new items contribute to the set of items in the directory rather than creating
+a new sub-directory.
 
 All sets of items are represented as directories of files in the underlying
 file system and all references are represented as simple files with the address
@@ -149,8 +151,7 @@ bundles/i0/pieces/i1
 bundles/i0/pieces/i2
 bundles/i0/pieces/i3
 bundles/i0/files/i0
-bundles/i0/trees
-bundles/i0/trees/i0
+bundles/i0/trees/i0/home/rick/hello.tar.gz
 bundles/i0/commit
 bundles/i0/commit/message
 bundles/i0/commit/root
@@ -161,24 +162,20 @@ the manifest of an arbitrary file-tree hierarchy only one tree is necessary in
 many cases. Since there is only one tree (in this simple example), the root
 must point to it:
 
-bundles/0/commit/root:
+bundles/i0/commit/root:
 0
 
 The tree tells us what object each path maps to in this binary format:
-<path-length><path><value-length><value>
-A value is a type and an ID value (each 8b uint64s).
 
-The format is interpreted in the example below so we can read it.
-
-bundles/0/trees/0:
-20,/home/rick/hello.tar.gz,16,{type: file, value: 0}
+bundles/i0/trees/i0/home/rick/hello.tar.gz:
+{type: file, value: i0}
 
 In this case the file is quite large at a little under 64MB, so it is broken
 into four pieces. A file is represented with a file in the files sub-dir of the
 bundle and it merely lists each piece's ID one after the other in binary
 format. This is represented as a comma delimited list so we can read it.
 
-bundles/0/files/0:
+bundles/i0/files/i0:
 0,1,2,3
 
 Finally each of the pieces themselves are 16MB or less of data that was copied
@@ -303,3 +300,80 @@ that can be more efficient for more random-access workloads.
 
 Implementation
 ==============
+
+BundleFS is implemented by forking wrapfs from Erez Zadok for Linux (and BSD).
+Both BundleFS and the tests link against a common library in C that can run
+both in user-space and the kernel. The user-space library is also linked with
+the command-line tools that Merkel-ify a bundle so it can be shared with
+others. The common library is implemented on top of a context that is either
+implemented in terms of the underlying file system in the kernel or using the
+POSIX API for unit tests and the command line tools.
+
+The common library exposes three objects that can be manipulated with the
+common library's API to browse, manage, modify, and create bundles:
+
+(1) Pieces
+(2) Files
+(3) Trees
+(4) Stubs
+(5) Commits
+
+Commits are 1:1 with bundles and contain all information necessary to modify
+their parent commits to the state described in the commit message. Commits
+exist in two states: (1) staging, and (2) committed. Commits are created based
+on zero, one, or more parent commits in the staging state. At this point any
+files within the commit that are modified must have the requisite trees created
+and/or updated and files and pieces faulted in or created so they can then be
+modified there.
+
+Stubs are used to perform wide-scale changes across a very large distributed
+repository. Stubs can replace other trees so that a user can download the
+latest bundle for a very large repository without having to download all of the
+contained trees, but only the one(s) in which he plans to make modifications. A
+stub appears as an empty un-readable un-writable directory when the bundle is
+cloned and mounted and it includes the SHA1 root of the Merkel tree rooted at
+that stub so a correct Merkel root can be computed when the user commits
+changes. This form of scaling requires that directories contain a number of
+items that can be efficiently listed by the underlying file system on a single
+node. It would be straight forward to support stubbing out sub-sets of
+directory items but directory balancing is already a commonly used tool for
+partitioning and scaling that this extra work is left for the future. Stubs are
+just files in the tree that have the same name as the directory they are
+stubbing out and their contents are the Merkel root of that stubbed tree.
+
+Trees are directory trees that match up with the trees they are bundling. The
+files are lists of piece IDs instead of actual file content and zero or more of
+the directories may be stub files.
+
+Files are simple files that represent actual files with data by indicating a
+list of pieces that map the file offsets to actual data.
+
+Pieces are 16MB or smaller immutable ranges of data that can be mapped to by
+Files in Trees and are all stored together in a pieces directory of the bundle.
+
+The API used by the common library is very much like the POSIX file system API:
+* open:   open a file, adding it to the tree if necessary when the bundle is
+          staging.
+* close:  close a file.
+* unlink: remove a file, removing it from the tree when staging.
+* read:   read from a file, marking that piece as read from when staging.
+* write:  write to a file, faulting in that piece or updating the already
+          faulted in pieces when staging. 
+* mkdir:  create a new directory, adding it to the tree when staging.
+* rmdir:  remove a directory, removing it from the tree when staging.
+* list:   list the contents of a directory.
+
+There are additional API calls to support management and creation of bundles:
+* format: format an empty directory so it can be used with BundleFS.
+* init:   initialize the server (either FUSE or the kernel module).
+* clone:  clone a commit, creating a new branch that can be mounted.
+* mount:  mount a commit as a writable snapshot.
+* umount: unmount a fully committed writable snapshot.
+* merge:  merge one branch into another producing a new commit with two
+	  parents. If there are conflicts the branch is left in the staging
+	  state and conflicts are indicated. If none the branch is left in the
+          committed state.
+
+The common library is (system) tested using a FUSE file system that implements
+the BundleFS features in user space and tests BundleFS using shell scripts and
+standard file system tests. There are also unit tests.
