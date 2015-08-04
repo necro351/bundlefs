@@ -1,2 +1,2 @@
-SOURCES+=test.c
-HEADERS+=test.h
+SOURCES+=test/test.c
+HEADERS+=test/test.h

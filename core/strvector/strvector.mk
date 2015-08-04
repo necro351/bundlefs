@@ -1,6 +1,6 @@
-SOURCES+=strvector.c
-HEADERS+=strvector.h
+SOURCES+=strvector/strvector.c
+HEADERS+=strvector/strvector.h
 TESTS+=strvector_test
 
-strvector_test: strvector/strvector_test.c
-	$(CC) $(CFLAGS) -o strvector_test
+strvector_test: libcore.a strvector/strvector_test.c
+	$(CC) strvector/strvector_test.c -static -L. -lcore $(CFLAGS) -o strvector_test

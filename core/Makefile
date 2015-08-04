@@ -1,18 +1,18 @@
-CFLAGS=-Wall -Werror
+CFLAGS=-g -Wall -Werror -I. -DPOSIX_CONTEXT
 
 SOURCES=
 HEADERS=
 TESTS=
-MODULES=context.mk \
-	locktree.mk \
-	strvector.mk \
-	test.mk
+MODULES=context/context.mk \
+	locktree/locktree.mk \
+	strvector/strvector.mk \
+	test/test.mk
 
 include $(MODULES)
 
 libcore.a: $(SOURCES) $(HEADERS)
-	$(CC) -c $(SOURCES) $(CFLAGS) -o core.o
-	$(AR) -rcs libcore.a core.o
+	$(CC) -c $(SOURCES) $(CFLAGS)
+	$(AR) -rcs libcore.a test.o strvector.o
 
 check: $(TESTS)
 	for test in $(TESTS); do $$test; done

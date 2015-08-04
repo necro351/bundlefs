@@ -3,6 +3,7 @@
 
 typedef int (*test_func_t)();
 
-void run_test(test_func_t test, const char* description);
+void test_run(test_func_t test, const char* description);
+void test_exit();
 
 #endif

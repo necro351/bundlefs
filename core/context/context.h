@@ -19,6 +19,12 @@
 // POSIX context definitions
 #ifdef POSIX_CONTEXT
 
+#include <string.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+
 #define rwlock pthread_rwlock_t
 #define rwlock_init pthread_rwlock_init
 #define rwlock_rdlock pthread_rwlock_rdlock
@@ -26,13 +32,17 @@
 #define rwlock_rdunlock pthread_rwlock_unlock
 #define rwlock_wrunlock pthread_rwlock_unlock
 
-#define gen_alloc malloc
+#define gen_realloc realloc
 #define gen_free free
 
 // defined by includes: strdup
 // defined by includes: strnlen
+// defined by includes: memset
+// defined by includes: exit
 
 #define print printf
+
+// defined by includes: ENOMEM
 
 #endif
 
