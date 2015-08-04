@@ -22,14 +22,13 @@ static const char *bundle_path = "/bundle";
 static int bundle_ioctl(const char *path, int cmd, void *arg,
 		      struct fuse_file_info *info, unsigned int flags, void *data)
 {
-	/* If the commit command is given to the root directory then wait until
-	 * a timeout for files to be closed and then move the branch for this
-	 * mountpoint to a new bundle which starts off by using the previous
-	 * bundle's tree as its root, thus sealing the previous bundle and
-	 * leaving it in a read-only state where new changes are directed to
-	 * the new bundle the branch now points at. The previous bundle is now
-	 * committed.
-	 */
+	// Wait for ongoing operations to cease so we can ensure all
+	// directories, files, and pieces will not be modified once the commit
+	// is complete.
+
+	// Update the branch we are commiting to by creating a new bundle to
+	// fault into and listing the current bundle as the parent and updating
+	// the pairing branch pointer to point to the newly created bundle.
 	return 0;
 }
 
