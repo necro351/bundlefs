@@ -1,5 +1,6 @@
-CFLAGS=-g -Wall -Werror -I. -DPOSIX_CONTEXT
+all: libcore.a
 
+CFLAGS=-g -Wall -Werror -I. -DPOSIX_CONTEXT
 SOURCES=
 HEADERS=
 TESTS=
@@ -15,7 +16,7 @@ libcore.a: $(SOURCES) $(HEADERS)
 	$(AR) -rcs libcore.a test.o strvector.o
 
 check: $(TESTS)
-	for test in $(TESTS); do $$test; done
+	@for test in $(TESTS); do ./$$test; done
 
 .PHONY: clean
 clean:
