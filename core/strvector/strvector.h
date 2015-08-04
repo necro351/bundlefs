@@ -7,8 +7,6 @@ typedef struct {
 	int size;
 } strvector;
 
-extern strvector strvector_zero;
-
 void strv_init(strvector* vector);
 int strv_append(strvector* vector, const char *string);
 void strv_clear(strvector* vector);

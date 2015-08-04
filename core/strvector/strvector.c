@@ -1,12 +1,6 @@
 #include "strvector/strvector.h"
 #include "context/context.h"
 
-strvector strvector_zero = {
-	.strings = (char**)0,
-	.capacity = 0,
-	.size = 0,
-};
-
 void strv_init(strvector* vector) {
 	memset(vector, 0, sizeof(strvector));
 }

@@ -3,7 +3,7 @@
 #include "test/test.h"
 
 int test_simple_appends() {
-	strvector vec = strvector_zero;
+	strvector vec;
 	strv_init(&vec);
 	strv_append(&vec, "bob");
 	strv_append(&vec, "joe");
@@ -18,7 +18,7 @@ int test_simple_appends() {
 }
 
 int test_strdup() {
-	strvector vec = strvector_zero;
+	strvector vec;
 	strv_init(&vec);
 	char buffer[4] = "abc";
 	strv_append(&vec, buffer);
