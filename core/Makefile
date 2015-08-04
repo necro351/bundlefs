@@ -16,3 +16,7 @@ libcore.a: $(SOURCES) $(HEADERS)
 
 check: $(TESTS)
 	for test in $(TESTS); do $$test; done
+
+.PHONY: clean
+clean:
+	rm -f *.o *.a *_test
