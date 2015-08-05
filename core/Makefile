@@ -1,6 +1,7 @@
 all: libcore.a
 
 CFLAGS=-g -Wall -Werror -I. -DPOSIX_CONTEXT
+LDFLAGS=-lpthread
 SOURCES=
 HEADERS=
 TESTS=
@@ -13,7 +14,7 @@ include $(MODULES)
 
 libcore.a: $(SOURCES) $(HEADERS)
 	$(CC) -c $(SOURCES) $(CFLAGS)
-	$(AR) -rcs libcore.a test.o strvector.o
+	$(AR) -rcs libcore.a *.o
 
 # We have to tell valgrind to not look for undefined value errors because it
 # gets confused by malloc in glibc and by simple usage like memset(&thing, 0,
