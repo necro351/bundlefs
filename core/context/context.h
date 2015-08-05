@@ -19,6 +19,7 @@
 // POSIX context definitions
 #ifdef POSIX_CONTEXT
 
+#define _GNU_SOURCE
 #include <string.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -40,11 +41,17 @@
 // defined by includes: strnlen
 // defined by includes: memset
 // defined by includes: exit
-// defined by includes: stat
-typedef struct stat stat_t;
-int gen_stat(const char* path, stat_t* buf);
+// defined by includes: basename
 
 #define print printf
+
+// defined by includes: stat
+// defined by includes: sync
+typedef struct stat stat_t;
+int gen_stat(const char* path, stat_t* buf);
+int gen_rename(const char* oldpath, const char* newpath);
+typedef int(*entryitor_t)(void* ctx, const char* name);
+int listdir(const char* dirpath, void* ctx, entryitor_t itor);
 
 // defined by includes: ENOMEM
 
