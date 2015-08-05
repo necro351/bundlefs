@@ -16,8 +16,14 @@ gcc -Wall bundle.c `pkg-config fuse --cflags --libs` -o bundle
 #include <errno.h>
 #include <fcntl.h>
 
+#include "../core/context/context.h"
+
 static const char *bundle_str = "Hello World!\n";
 static const char *bundle_path = "/bundle";
+
+static char* repo;
+static char* mountpt;
+static pthread_rwlock_t repo_lock;
 
 static int bundle_ioctl(const char *path, int cmd, void *arg,
 		      struct fuse_file_info *info, unsigned int flags, void *data)
@@ -25,10 +31,19 @@ static int bundle_ioctl(const char *path, int cmd, void *arg,
 	// Wait for ongoing operations to cease so we can ensure all
 	// directories, files, and pieces will not be modified once the commit
 	// is complete.
+	pthread_rwlock_wrlock(&repo_lock);
 
-	// Update the branch we are commiting to by creating a new bundle to
-	// fault into and listing the current bundle as the parent and updating
-	// the pairing branch pointer to point to the newly created bundle.
+	// Determine the branch being committed by removing the mountpt prefix
+	// from the absolute path and then removing the head of the path.
+	char* brname = branch_name(path);
+
+	// <repo>/branches/K is the current 
+	//
+	strcat
+	int err = mkdir(
+
+	free(brname);
+	pthread_rwlock_unlock(&repo_lock);
 	return 0;
 }
 
@@ -106,5 +121,7 @@ static struct fuse_operations bundle_oper = {
 
 int main(int argc, char *argv[])
 {
+	pthread_init(&repo_lock);
+
 	return fuse_main(argc, argv, &bundle_oper, NULL);
 }

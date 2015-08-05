@@ -8,7 +8,8 @@ TESTS=
 MODULES=context/context.mk \
 	locktree/locktree.mk \
 	strvector/strvector.mk \
-	test/test.mk
+	test/test.mk \
+	repo/repo.mk
 
 include $(MODULES)
 

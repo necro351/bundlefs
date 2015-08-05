@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 #define rwlock pthread_rwlock_t
 #define rwlock_init pthread_rwlock_init
@@ -39,6 +40,9 @@
 // defined by includes: strnlen
 // defined by includes: memset
 // defined by includes: exit
+// defined by includes: stat
+typedef struct stat stat_t;
+int gen_stat(const char* path, stat_t* buf);
 
 #define print printf
 
