@@ -1,4 +1,5 @@
 #include "repo/repo.h"
+#include "strvector/strvector.h"
 
 /*
  * The layout of a repository:
@@ -16,11 +17,12 @@
  * repo/files:  where file objects are stored
  */
 
-const char* DIR_TYPE = "dirs"
-const char* PIECE_TYPE = "pieces"
-const char* FILE_TYPE = "files"
+const char* DIR_TYPE = "dirs";
+const char* PIECE_TYPE = "pieces";
+const char* FILE_TYPE = "files";
 
 char* branch_name(repo* rep, const char* abspath);
+int moveobjects(const char* dst, const char* src, const char* objtype);
 
 void repo_init(repo* rep) {
 	memset(rep, 0, sizeof(repo));
@@ -62,7 +64,7 @@ int repo_commit(repo* rep, const char* branchpath) {
 	char* rootpath = NULL;
 	char* headpath = NULL;
 	char* brname = basename(branchpath);
-	char* brhandle = gen_alloc(strlen(branchpath)+strlen(brname)+1);
+	char* brhandle = gen_malloc(strlen(branchpath)+strlen(brname)+1);
 	if (!brhandle) {
 		err = -ENOMEM;
 		goto exit;
@@ -89,14 +91,14 @@ int repo_commit(repo* rep, const char* branchpath) {
 
 	// Now move the staged root over the branch head to atomically update
 	// head.
-	rootpath = gen_alloc(strlen(branchpath) + 1 + 4 + 1);
+	rootpath = gen_malloc(strlen(branchpath) + 1 + 4 + 1);
 	if (!rootpath) {
 		err = -ENOMEM;
 		goto exit;
 	}
 	strcpy(rootpath, branchpath);
 	strcat(rootpath, "/root");
-	headpath = gen_alloc(strlen(branchpath) + 1 + 4 + 1);
+	headpath = gen_malloc(strlen(branchpath) + 1 + 4 + 1);
 	if (!headpath) {
 		err = -ENOMEM;
 		goto exit;
@@ -132,33 +134,40 @@ struct movectx {
 	char* dst_template_end;
 	char* src_template;
 	char* src_template_end;
+	strvector commands;
 };
 int moveobjects_itor(void* vctx, const char* name) {
-	movectx* ctx = (movectx*)vctx;
+	int err = 0;
+	struct movectx* ctx = (struct movectx*)vctx;
 	if (strlen(name) > MAX_NAME_LEN) {
 		return -ENOMEM;
 	}
 	strcat(ctx->src_template, name);
 	strcat(ctx->dst_template, name);
-	int err = gen_rename(ctx->src_template, ctx->dst_template);
+	err = strv_append(&ctx->commands, ctx->src_template);
+	if (err)
+		return err;
+	err = strv_append(&ctx->commands, ctx->dst_template);
 	*ctx->src_template_end = '\0';
 	*ctx->dst_template_end = '\0';
 	return err;
 }
-int moveobjects(char* dst, char* src, char* objtype) {
+int moveobjects(const char* dst, const char* src, const char* objtype) {
+	char* srcobj = NULL;
 	int err = 0;
 	struct movectx ctx;
-	memset(&ctx, 0, sizeof(movectx));
+	memset(&ctx, 0, sizeof(struct movectx));
+	strv_init(&ctx.commands);
 
 	int srclen = strlen(src);
 	int dstlen = strlen(dst);
 	int typelen = strlen(objtype);
-	ctx.src_template = gen_alloc(srclen + 1 + typelen + 1 + MAX_NAME_LEN + 1);
+	ctx.src_template = gen_malloc(srclen + 1 + typelen + 1 + MAX_NAME_LEN + 1);
 	if (!ctx.src_template) {
 		err = -ENOMEM;
 		goto exit;
 	}
-	ctx.dst_template = gen_alloc(dstlen + 1 + typelen + 1 + MAX_NAME_LEN + 1);
+	ctx.dst_template = gen_malloc(dstlen + 1 + typelen + 1 + MAX_NAME_LEN + 1);
 	if (!ctx.dst_template) {
 		err = -ENOMEM;
 		goto exit;
@@ -171,14 +180,29 @@ int moveobjects(char* dst, char* src, char* objtype) {
 	strcat(ctx.dst_template, "/");
 	strcat(ctx.dst_template, objtype);
 	strcat(ctx.dst_template, "/");
-	ctx.src_template_end = ctx.src_template + srclen;
-	ctx.dst_template_end = ctx.dst_template + dstlen;
+	ctx.src_template_end = ctx.src_template + srclen + 1 + typelen + 1;
+	ctx.dst_template_end = ctx.dst_template + dstlen + 1 + typelen + 1;
+	srcobj = strdup(ctx.src_template);
+	if (!srcobj)
+		goto exit;
 
-	err = listdir(src, &ctx, moveobjects_itor);
+	err = listdir(srcobj, &ctx, moveobjects_itor);
+	if (err)
+		goto exit;
+
+	int i;
+	for (i = 0; i < ctx.commands.size; i += 2) {
+		err = gen_rename(ctx.commands.strings[i], ctx.commands.strings[i+1]);
+		if (err)
+			goto exit;
+	}
 exit:
 	if (ctx.src_template)
 		gen_free(ctx.src_template);
 	if (ctx.dst_template)
 		gen_free(ctx.dst_template);
+	if (srcobj)
+		gen_free(srcobj);
+	strv_free(&ctx.commands);
 	return err;
 }

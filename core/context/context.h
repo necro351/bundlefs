@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #define rwlock pthread_rwlock_t
 #define rwlock_init pthread_rwlock_init
@@ -35,6 +36,7 @@
 #define rwlock_wrunlock pthread_rwlock_unlock
 
 #define gen_realloc realloc
+#define gen_malloc malloc
 #define gen_free free
 
 // defined by includes: strdup

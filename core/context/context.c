@@ -29,7 +29,7 @@ int listdir(const char* dirpath, void* ctx, entryitor_t itor) {
 		return -ENOENT;
 	}
 
-	while (ep = readdir(dp)) {
+	while ((ep = readdir(dp))) {
 		err = itor(ctx, ep->d_name);
 		if (err != 0) {
 			break;
