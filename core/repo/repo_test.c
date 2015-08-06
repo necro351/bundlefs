@@ -1,4 +1,7 @@
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "repo/repo.h"
 #include "test/test.h"
 
@@ -32,11 +35,12 @@ int test_moveobjects() {
 	err = moveobjects("TEST/expected", "TEST/staged", "objs");
 	if (err)
 		goto exit;
-	char checkcommand[256] = "stat TEST/expected/x";
-	pos = strlen(checkcommand) - 1;
+	char checkpath[256] = "TEST/expected/objs/x";
+	pos = strlen(checkpath) - 1;
 	for (a = '0'; a <= '9'; a++) {
-		checkcommand[pos] = a;
-		err = system(checkcommand);
+		checkpath[pos] = a;
+		struct stat buf;
+		err = stat(checkpath, &buf);
 		if (err)
 			goto exit;
 	}

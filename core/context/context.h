@@ -41,6 +41,7 @@
 
 // defined by includes: strdup
 // defined by includes: strnlen
+// defined by includes: strcmp
 // defined by includes: memset
 // defined by includes: exit
 // defined by includes: basename

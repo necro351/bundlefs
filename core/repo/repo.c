@@ -137,11 +137,14 @@ struct movectx {
 	strvector commands;
 };
 int moveobjects_itor(void* vctx, const char* name) {
+	if (!strcmp(name, "."))
+		return 0;
+	if (!strcmp(name, ".."))
+		return 0;
 	int err = 0;
 	struct movectx* ctx = (struct movectx*)vctx;
-	if (strlen(name) > MAX_NAME_LEN) {
+	if (strlen(name) > MAX_NAME_LEN)
 		return -ENOMEM;
-	}
 	strcat(ctx->src_template, name);
 	strcat(ctx->dst_template, name);
 	err = strv_append(&ctx->commands, ctx->src_template);
