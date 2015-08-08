@@ -1,4 +1,7 @@
 SOURCES+=repo/repo.c
+SOURCES+=repo/moveobjects.c
+SOURCES+=repo/fault.c
+SOURCES+=repo/maxid.c
 HEADERS+=repo/repo.h
 TESTS+=repo_test
 

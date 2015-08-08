@@ -53,17 +53,3 @@ int find_comp(ltnode* root, char* comp) {
 	return -1;
 }
 
-char* path_head(char** path) {
-	char* end = *path;
-	if (*end == '\0')
-		return NULL;
-	while (*end != '/' && *end != '\0')
-		end++;
-	while (*end == '/') {
-		*end = '\0';
-		end++;
-	}
-	char* head = *path;
-	*path = end;
-	return head;
-}

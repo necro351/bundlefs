@@ -19,7 +19,6 @@
 // POSIX context definitions
 #ifdef POSIX_CONTEXT
 
-#define _GNU_SOURCE
 #include <string.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -27,34 +26,52 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <inttypes.h>
+#include <fcntl.h>
 
-#define rwlock pthread_rwlock_t
+typedef pthread_rwlock_t rwlock;
 #define rwlock_init pthread_rwlock_init
+#define rwlock_destroy pthread_rwlock_destroy
 #define rwlock_rdlock pthread_rwlock_rdlock
 #define rwlock_wrlock pthread_rwlock_wrlock
 #define rwlock_rdunlock pthread_rwlock_unlock
 #define rwlock_wrunlock pthread_rwlock_unlock
 
+typedef pthread_mutex_t mutex;
+#define mutex_init pthread_mutex_init
+#define mutex_destroy pthread_mutex_destroy
+#define mutex_lock pthread_mutex_lock
+#define mutex_unlock pthread_mutex_unlock
+
 #define gen_realloc realloc
 #define gen_malloc malloc
 #define gen_free free
+// defined by includes: exit
 
+#define gen_sprintf sprintf
+#define gen_printf printf
+#define gen_sscanf sscanf
 // defined by includes: strdup
 // defined by includes: strnlen
 // defined by includes: strcmp
 // defined by includes: memset
-// defined by includes: exit
-// defined by includes: basename
-
-#define print printf
 
 // defined by includes: stat
 // defined by includes: sync
 typedef struct stat stat_t;
 int gen_stat(const char* path, stat_t* buf);
 int gen_rename(const char* oldpath, const char* newpath);
+int gen_mkdir(const char* path, mode_t mode);
 typedef int(*entryitor_t)(void* ctx, const char* name);
 int listdir(const char* dirpath, void* ctx, entryitor_t itor);
+int gen_open(const char* path, int options, mode_t mode);
+int gen_close(int fd);
+int gen_write(int fd, const char* buffer, size_t size);
+int gen_read(int fd, char* buffer, size_t size);
+// defined by includes: O_CREAT
+// defined by includes: O_RDWR
+
+// defined by includes: uint64_t
 
 // defined by includes: ENOMEM
 

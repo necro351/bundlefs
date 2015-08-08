@@ -4,12 +4,12 @@
 int test_exit_code = 0;
 
 void test_run(test_func_t test, const char* description) {
-	print("TEST: %s", description);
+	gen_printf("TEST: %s", description);
 	if (test() < 0) {
-		print("...FAILED\n");
+		gen_printf("...FAILED\n");
 		test_exit_code = 1;
 	} else {
-		print("\n");
+		gen_printf("\n");
 	}
 }
 

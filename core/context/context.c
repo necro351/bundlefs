@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <fcntl.h>
 
 int gen_stat(const char* path, stat_t* buf) {
 	if (stat(path, buf)) {
@@ -15,6 +16,42 @@ int gen_stat(const char* path, stat_t* buf) {
 
 int gen_rename(const char* oldpath, const char* newpath) {
 	if (rename(oldpath, newpath)) {
+		return -errno;
+	}
+	return 0;
+}
+
+int gen_mkdir(const char* path, mode_t mode) {
+	if (mkdir(path, mode)) {
+		return -errno;
+	}
+	return 0;
+}
+
+int gen_open(const char* path, int options, mode_t mode) {
+	int fd = open(path, options, mode);
+	if (fd < 0) {
+		return -errno;
+	}
+	return fd;
+}
+
+int gen_write(int fd, const char* buffer, size_t size) {
+	if (write(fd, buffer, size)) {
+		return -errno;
+	}
+	return 0;
+}
+
+int gen_read(int fd, char* buffer, size_t size) {
+	if (read(fd, buffer, size)) {
+		return -errno;
+	}
+	return 0;
+}
+
+int gen_close(int fd) {
+	if (close(fd)) {
 		return -errno;
 	}
 	return 0;

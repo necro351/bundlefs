@@ -18,7 +18,49 @@ exit:
 }
 */
 
-extern int moveobjects(const char* dst, const char* src, const char* objtype);
+int test_repo_new() {
+	// Make the repository
+	repo rep;
+	repo_init(&rep);
+	int err = 0;
+	system("mkdir -p TEST/repo");
+	system("mkdir TEST/mnt");
+	err = repo_open(&rep, "TEST/mnt", "TEST/repo");
+	if (err)
+		goto exit;
+
+	// Create some new branches
+	err = repo_new(&rep, "rick");
+	if (err)
+		goto exit;
+	err = repo_new(&rep, "sean");
+	if (err)
+		goto exit;
+	err = repo_new(&rep, "sandra");
+	if (err)
+		goto exit;
+
+	// Make sure they are there
+	struct stat buf;
+	err = stat("TEST/repo/rick", &buf);
+	if (err)
+		goto exit;
+	err = stat("TEST/repo/rick/", &buf);
+	if (err)
+		goto exit;
+	err = stat("TEST/repo/sean", &buf);
+	if (err)
+		goto exit;
+	err = stat("TEST/repo/sandra", &buf);
+	if (err)
+		goto exit;
+exit:
+	system("rm -rf TEST");
+	repo_destroy(&rep);
+	return err;
+}
+
+extern int moveobjects(const char* dst, const char* src);
 int test_moveobjects() {
 	int err = 0;
 	system("mkdir -p TEST/staged/objs");
@@ -32,7 +74,7 @@ int test_moveobjects() {
 		if (err)
 			goto exit;
 	}
-	err = moveobjects("TEST/expected", "TEST/staged", "objs");
+	err = moveobjects("TEST/expected/objs", "TEST/staged/objs");
 	if (err)
 		goto exit;
 	char checkpath[256] = "TEST/expected/objs/x";
