@@ -3,7 +3,8 @@
 
 #include "context/context.h"
 
-extern const int MAX_OBJID_LEN;
+#define MAX_OBJID_LEN 128
+#define MAX_PATH_LEN  4096
 
 typedef struct {
 	char* mountpt;
@@ -22,7 +23,8 @@ uint64_t repo_newid(repo* rep);
 
 // Declarations private within the repo object, do not use these symbols
 // outside of repo.
-extern const int MAX_PATH_LEN;
+extern const int BUNDLE_TYPE_DIR;
+extern const int BUNDLE_TYPE_FILE;
 int moveobjects(const char* dst, const char* src);
 int setmaxid(repo* rep);
 

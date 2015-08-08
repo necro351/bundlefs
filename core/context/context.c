@@ -36,15 +36,17 @@ int gen_open(const char* path, int options, mode_t mode) {
 	return fd;
 }
 
-int gen_write(int fd, const char* buffer, size_t size) {
-	if (write(fd, buffer, size)) {
+int gen_write(int fd, const char* buffer, size_t size, int* nbytes) {
+	*nbytes = write(fd, buffer, size);
+	if (*nbytes < 0) {
 		return -errno;
 	}
 	return 0;
 }
 
-int gen_read(int fd, char* buffer, size_t size) {
-	if (read(fd, buffer, size)) {
+int gen_read(int fd, char* buffer, size_t size, int* nbytes) {
+	*nbytes = read(fd, buffer, size);
+	if (*nbytes < 0) {
 		return -errno;
 	}
 	return 0;

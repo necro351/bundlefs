@@ -18,8 +18,6 @@
 const char* DIR_TYPE = "dirs";
 const char* PIECE_TYPE = "pieces";
 const char* FILE_TYPE = "files";
-const int MAX_PATH_LEN = 4096;
-const int MAX_OBJID_LEN = 128;
 
 void repo_init(repo* rep) {
 	memset(rep, 0, sizeof(repo));
@@ -156,7 +154,8 @@ int repo_new(repo* rep, const char* newname) {
 		goto exit;
 	}
 	gen_sprintf(path, "%lu\n", nextid);
-	err = gen_write(fd, path, strlen(path));
+	int nbytes;
+	err = gen_write(fd, path, strlen(path), &nbytes);
 	if (err)
 		goto exit;
 	gen_close(fd);

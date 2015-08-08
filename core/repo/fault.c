@@ -24,12 +24,9 @@
  * repo/objs/46: [731.jpg:5, 732.jpg:4]
  */
 
-const int LOOKUP_DIR = 0;
-const int LOOKUP_FILE = 1;
-const int LOOKUP_NOENT = 2;
 char* path_head(char** path);
-int dirobjlookup(char* objectstore, char* objectstoreend, const char* name, char* obj);
-int getsmallobj(char* objectstore, char* obj);
+int getobjtype(char* object, int* type);
+int getvalue(char* objectstore, char* obj);
 
 /*
  * Create new directory objects in the branch's stage such that the file or
@@ -59,7 +56,7 @@ int faultpath(repo* rep, const char* brname, const char* path, char* obj) {
 	}
 
 	gen_sprintf(objectstore, "%s/br/%s/stage/root", rep->repo, brname);
-	err = getsmallobj(objectstore, obj);
+	err = getvalue(objectstore, obj);
 	if (err)
 		goto exit;
 	char* name = obj;
@@ -67,23 +64,29 @@ int faultpath(repo* rep, const char* brname, const char* path, char* obj) {
 	char* endobjectstore = objectstore + objectstorelen;
 	err = -EIO; // if err not set then there is no root (!?) treat it as EIO
 	while (name != NULL) {
-		err = dirobjlookup(objectstore, endobjectstore, name, obj);
+		gen_sprintf(endobjectstore, "%s/", obj);
+		int type;
+		err = getobjtype(endobjectstore, &type);
 		if (err < 0)
 			goto exit;
-		else if (err == LOOKUP_FILE) {
+		if (type == BUNDLE_TYPE_FILE) {
 			// It's OK for the component to be a file iff it's last
 			char* next = path_head(&pathcopy);
 			if (next) {
 				err = -ENOENT;
 			}
 			goto exit;
-		} else if (err == LOOKUP_NOENT) {
+		} else if (type == BUNDLE_TYPE_DIR) {
+			gen_sprintf(endobjectstore, "%s/%s", obj, name);
+			err = getvalue(objectstore, obj);
+			if (err)
+				goto exit;
+		} else /* UNKNOWN */ {
 			gen_sprintf(endobjectstore, "i%lu", repo_newid(rep));
 			err = gen_mkdir(objectstore, (mode_t)0700);
 			if (err)
 				goto exit;
-		} else /* err == LOOKUP_DIR */
-			strcpy(endobjectstore, obj);
+		}
 		name = path_head(&pathcopy);
 	}
 exit:
@@ -117,25 +120,27 @@ char* path_head(char** path) {
 	return head;
 }
 
-int dirobjlookup(char* objectstore, char* objectstoreend, const char* name, char* obj) {
-	strcpy(objectstoreend, name);
-	int err = getsmallobj(objectstore, obj);
-	*objectstoreend = '\0';
+const int BUNDLE_TYPE_DIR = 'd';
+const int BUNDLE_TYPE_FILE = 'f';
+int getobjtype(char* object, int* type) {
+	strcat(object, "/.bundlefs_type");
+	char value[MAX_OBJID_LEN] = "";
+	int err = getvalue(object, value);
+	*type = value[0];
 	return err;
 }
 
-int getsmallobj(char* objectstore, char* obj) {
+int getvalue(char* object, char* value) {
 	int err = 0;
-	int fd = gen_open(objectstore, O_RDONLY, 0400);
+	int fd = gen_open(object, O_RDONLY, 0400);
 	if (fd < 0) {
 		return fd;
 	}
-	int nbytes = gen_read(fd, obj, MAX_OBJID_LEN-1);
-	if (nbytes < 0) {
-		err = -errno;
+	int nbytes;
+	err = gen_read(fd, value, MAX_OBJID_LEN-1, &nbytes);
+	if (err)
 		goto exit;
-	}
-	obj[nbytes-1] = '\0';
+	value[nbytes-1] = '\0';
 exit:
 	gen_close(fd);
 	return err;

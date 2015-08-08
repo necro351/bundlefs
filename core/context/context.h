@@ -66,8 +66,8 @@ typedef int(*entryitor_t)(void* ctx, const char* name);
 int listdir(const char* dirpath, void* ctx, entryitor_t itor);
 int gen_open(const char* path, int options, mode_t mode);
 int gen_close(int fd);
-int gen_write(int fd, const char* buffer, size_t size);
-int gen_read(int fd, char* buffer, size_t size);
+int gen_write(int fd, const char* buffer, size_t size, int* nbytes);
+int gen_read(int fd, char* buffer, size_t size, int* nbytes);
 // defined by includes: O_CREAT
 // defined by includes: O_RDWR
 
