@@ -23,7 +23,6 @@ static const char *bundle_path = "/bundle";
 
 static char* repo;
 static char* mountpt;
-static pthread_rwlock_t repo_lock;
 
 static int bundle_ioctl(const char *path, int cmd, void *arg,
 		      struct fuse_file_info *info, unsigned int flags, void *data)
@@ -31,19 +30,10 @@ static int bundle_ioctl(const char *path, int cmd, void *arg,
 	// Wait for ongoing operations to cease so we can ensure all
 	// directories, files, and pieces will not be modified once the commit
 	// is complete.
-	pthread_rwlock_wrlock(&repo_lock);
 
 	// Determine the branch being committed by removing the mountpt prefix
 	// from the absolute path and then removing the head of the path.
-	char* brname = branch_name(path);
 
-	// <repo>/branches/K is the current 
-	//
-	strcat
-	int err = mkdir(
-
-	free(brname);
-	pthread_rwlock_unlock(&repo_lock);
 	return 0;
 }
 
@@ -121,7 +111,5 @@ static struct fuse_operations bundle_oper = {
 
 int main(int argc, char *argv[])
 {
-	pthread_init(&repo_lock);
-
 	return fuse_main(argc, argv, &bundle_oper, NULL);
 }

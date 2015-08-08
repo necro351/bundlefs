@@ -1,3 +1,12 @@
+TL;DR
+=====
+1) Change into core
+2) Run make check
+3) All tests should pass
+4) Change into fuse
+5) We need a Makefile and fuse should use core so we can do some prototyping
+   and system testing
+
 Abstract
 ========
 
