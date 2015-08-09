@@ -119,7 +119,7 @@ exit:
 	return err;
 }
 
-extern int getobjtype(char* object, char* suffix, int* type);
+extern int getobjtype(char* object, int* type);
 int test_getobjtype() {
 	int err = 0;
 	system("mkdir -p TEST/objs/i0");
@@ -128,7 +128,8 @@ int test_getobjtype() {
 	char* suffix = obj + strlen(obj) + 1;
 	int type;
 
-	err = getobjtype(obj, suffix, &type);
+	err = getobjtype(obj, &type);
+	*suffix = '\0';
 	if (err)
 		goto exit;
 	if (type != BUNDLE_TYPE_FILE) {
@@ -137,7 +138,8 @@ int test_getobjtype() {
 	}
 
 	system("echo d > TEST/objs/i0/.bundlefs_type");
-	err = getobjtype(obj, suffix, &type);
+	err = getobjtype(obj, &type);
+	*suffix = '\0';
 	if (err)
 		goto exit;
 	if (type != BUNDLE_TYPE_DIR) {
@@ -147,7 +149,8 @@ int test_getobjtype() {
 
 	system("rm TEST/objs/i0/.bundlefs_type");
 	system("touch TEST/objs/i0/.bundlefs_type");
-	err = getobjtype(obj, suffix, &type);
+	err = getobjtype(obj, &type);
+	*suffix = '\0';
 	if (err)
 		goto exit;
 	if (type == BUNDLE_TYPE_FILE || type == BUNDLE_TYPE_DIR) {

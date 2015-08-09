@@ -43,26 +43,26 @@ int getvalue(char* objectstore, char* obj);
  */
 int faultpath(repo* rep, const char* brname, const char* path, char* obj) {
 	int err = 0;
-	char* pathbuffer = strdup(path);
-	char* pathcopy = pathbuffer;
+	char* pathbuf = strdup(path);
+	char* pathcopy = pathbuf;
 	if (!pathcopy) {
 		err = -ENOMEM;
 		goto exit;
 	}
-	char* objectstore = gen_malloc(MAX_PATH_LEN);
-	if (!objectstore) {
+	char* objpathbuf = gen_malloc(MAX_PATH_LEN);
+	if (!objpathbuf) {
 		err = -ENOMEM;
 		goto exit;
 	}
 
-	gen_sprintf(objectstore, "%s/br/%s/stage/root", rep->repo, brname);
-	err = getvalue(objectstore, obj);
+	gen_sprintf(objpathbuf, "%s/br/%s/stage/root", rep->repo, brname);
+	err = getvalue(objpathbuf, obj);
 	if (err)
 		goto exit;
 	char* name = obj;
-	int objectstorelen = gen_sprintf(objectstore, "%s/br/%s/stage/objs/", rep->repo, brname);
-	char* endobjectstore = objectstore + objectstorelen;
-	err = -EIO; // if err not set then there is no root (!?) treat it as EIO
+	int objectstorelen = gen_sprintf(objpathbuf, "%s/br/%s/stage/objs/", rep->repo, brname);
+	char* endobjectstore = objpathbuf + objectstorelen;
+	err = -EIO; // If err was not set then no root!? Treat it as EIO.
 	while (name != NULL) {
 		gen_sprintf(endobjectstore, "%s/", obj);
 		int type;
@@ -70,30 +70,29 @@ int faultpath(repo* rep, const char* brname, const char* path, char* obj) {
 		if (err < 0)
 			goto exit;
 		if (type == BUNDLE_TYPE_FILE) {
-			// It's OK for the component to be a file iff it's last
+			// The component can be a file iff it's last
 			char* next = path_head(&pathcopy);
-			if (next) {
+			if (next)
 				err = -ENOENT;
-			}
 			goto exit;
 		} else if (type == BUNDLE_TYPE_DIR) {
 			gen_sprintf(endobjectstore, "%s/%s", obj, name);
-			err = getvalue(objectstore, obj);
+			err = getvalue(objpathbuf, obj);
 			if (err)
 				goto exit;
 		} else /* UNKNOWN */ {
 			gen_sprintf(endobjectstore, "i%lu", repo_newid(rep));
-			err = gen_mkdir(objectstore, (mode_t)0700);
+			err = gen_mkdir(objpathbuf, (mode_t)0700);
 			if (err)
 				goto exit;
 		}
 		name = path_head(&pathcopy);
 	}
 exit:
-	if (pathbuffer)
-		gen_free(pathbuffer);
-	if (objectstore)
-		gen_free(objectstore);
+	if (pathbuf)
+		gen_free(pathbuf);
+	if (objpathbuf)
+		gen_free(objpathbuf);
 	return err;
 }
 
