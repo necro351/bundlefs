@@ -68,6 +68,6 @@ exit:
 		gen_free(ctx.src_template);
 	if (ctx.dst_template)
 		gen_free(ctx.dst_template);
-	strv_free(&ctx.commands);
+	strv_destroy(&ctx.commands);
 	return err;
 }

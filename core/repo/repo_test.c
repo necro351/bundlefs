@@ -119,41 +119,37 @@ exit:
 	return err;
 }
 
-extern int getobjtype(char* object, int* type);
-int test_getobjtype() {
+int test_object_type() {
 	int err = 0;
 	system("mkdir -p TEST/objs/i0");
 	system("echo f > TEST/objs/i0/.bundlefs_type");
-	char obj[MAX_PATH_LEN] = "TEST/objs/i0/";
-	char* suffix = obj + strlen(obj) + 1;
+	object obj;
+	object_init(&obj, "TEST/objs", "i0");
 	int type;
 
-	err = getobjtype(obj, &type);
-	*suffix = '\0';
+	err = object_type(&obj, &type);
 	if (err)
 		goto exit;
-	if (type != BUNDLE_TYPE_FILE) {
+	if (type != OBJECT_TYPE_FILE) {
 		err = -1;
 		goto exit;
 	}
 
 	system("echo d > TEST/objs/i0/.bundlefs_type");
-	err = getobjtype(obj, &type);
-	*suffix = '\0';
+	err = object_type(&obj, &type);
 	if (err)
 		goto exit;
-	if (type != BUNDLE_TYPE_DIR) {
+	if (type != OBJECT_TYPE_DIR) {
 		err = -1;
 		goto exit;
 	}
 
 	system("rm TEST/objs/i0/.bundlefs_type");
 	system("touch TEST/objs/i0/.bundlefs_type");
-	err = getobjtype(obj, &type);
-	*suffix = '\0';
+	err = object_type(&obj, &type);
 	if (err)
 		goto exit;
-	if (type == BUNDLE_TYPE_FILE || type == BUNDLE_TYPE_DIR) {
+	if (type == OBJECT_TYPE_FILE || type == OBJECT_TYPE_DIR) {
 		err = -1;
 		goto exit;
 	}
@@ -162,52 +158,44 @@ exit:
 	return err;
 }
 
-int test_manualpathlookup() {
+int test_pathlookup() {
 	int err = 0;
 	system("mkdir -p TEST/objs");
 	system("echo i0 > TEST/root");
 	system("mkdir -p  TEST/objs/i0/");
 	system("echo i1 > TEST/objs/i0/home");
+	system("echo d >  TEST/objs/i0/" OBJECT_HIDDEN_FILE);
 	system("mkdir -p  TEST/objs/i1/");
 	system("echo i3 > TEST/objs/i1/rick");
+	system("echo d >  TEST/objs/i1/" OBJECT_HIDDEN_FILE);
 	system("mkdir -p  TEST/objs/i3/");
 	system("echo i4 > TEST/objs/i3/hello.txt");
+	system("echo d >  TEST/objs/i3/" OBJECT_HIDDEN_FILE);
 	system("mkdir -p  TEST/objs/i4/");
 	system("echo i5 > TEST/objs/i4/0");
+	system("echo f >  TEST/objs/i4/" OBJECT_HIDDEN_FILE);
 	system("mkdir -p  TEST/objs/i5/");
 	system("echo hello world > TEST/objs/i5/data");
-	char value[128];
-	char buffer[MAX_PATH_LEN];
 
-	err = getvalue("TEST/root", value);
-	if (err || strcmp(value, "i0"))
+	path pth;
+	path_init(&pth);
+	err = path_lookup(&pth, "TEST", "home/rick/hello.txt");
+	if (err)
 		goto exit;
-
-	gen_sprintf(buffer, "TEST/objs/%s/home", value);
-	err = getvalue(buffer, value);
-	if (err || (strcmp(value, "i1") ? (err=-EINVAL) : 0))
+	if (pth.components.size != 4 ||
+			strcmp("/", pth.components.strings[0]) ||
+			strcmp("home", pth.components.strings[1]) ||
+			strcmp("rick", pth.components.strings[2]) ||
+			strcmp("hello.txt", pth.components.strings[3]) ||
+			strcmp("i0", pth.objids[0]) ||
+			strcmp("i1", pth.objids[1]) ||
+			strcmp("i3", pth.objids[2]) ||
+			strcmp("i4", pth.objids[3])) {
+		err = -1;
 		goto exit;
-
-	gen_sprintf(buffer, "TEST/objs/%s/rick", value);
-	err = getvalue(buffer, value);
-	if (err || (strcmp(value, "i3") ? (err=-EINVAL) : 0))
-		goto exit;
-
-	gen_sprintf(buffer, "TEST/objs/%s/hello.txt", value);
-	err = getvalue(buffer, value);
-	if (err || (strcmp(value, "i4") ? (err=-EINVAL) : 0))
-		goto exit;
-
-	gen_sprintf(buffer, "TEST/objs/%s/0", value);
-	err = getvalue(buffer, value);
-	if (err || (strcmp(value, "i5") ? (err=-EINVAL) : 0))
-		goto exit;
-
-	gen_sprintf(buffer, "TEST/objs/%s/data", value);
-	err = getvalue(buffer, value);
-	if (strcmp(value, "hello world"))
-		err = -EINVAL;
+	}
 exit:
+	path_destroy(&pth);
 	system("rm -rf TEST");
 	return err;
 }
@@ -215,8 +203,8 @@ exit:
 int main(void) {
 	test_run(test_moveobjects, "moveobjects");
 	test_run(test_getvalue, "getvalue");
-	test_run(test_manualpathlookup, "manual path lookup");
-	test_run(test_getobjtype, "getobjtype");
+	test_run(test_pathlookup, "path lookup");
+	test_run(test_object_type, "getobjtype");
 	//test_run(test_repo_commit, "repo_commit");
 	test_exit();
 	return 0;

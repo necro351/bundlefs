@@ -31,16 +31,15 @@ int strv_append(strvector* vector, const char *string) {
 	return 0;
 }
 
-void strv_free(strvector* vector) {
+void strv_clear(strvector* vector) {
 	int i;
-	for (i = 0; i < vector->size; i++) {
+	for (i = 0; i < vector->size; i++)
 		gen_free(vector->strings[i]);
-	}
-	gen_free(vector->strings);
+	vector->size = 0;
 }
 
-void strv_clear(strvector* vector) {
-	strv_free(vector);
-	strv_init(vector);
+void strv_destroy(strvector* vector) {
+	strv_clear(vector);
+	gen_free(vector->strings);
 }
 

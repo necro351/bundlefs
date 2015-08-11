@@ -10,7 +10,7 @@ typedef struct {
 void strv_init(strvector* vector);
 int strv_append(strvector* vector, const char *string);
 void strv_clear(strvector* vector);
-void strv_free(strvector* vector);
+void strv_destroy(strvector* vector);
 
 #define STRV_INIT_SIZE 8
 #define STRV_MAX_STR 1024
