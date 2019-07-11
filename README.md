@@ -104,7 +104,7 @@ is how BundleFS achieves most of its data protection.
 command line tools and new tools can be easily written to understand it as
 well. Furthermore since the bundles are just directories of files they can be
 moved around, checksummed, compressed, and distributed. The on-disk bundle
-format is always preserved and more efficient approaches are abandonned if they
+format is always preserved and more efficient approaches are abandoned if they
 comprimise the simplicity of the bundle format.
 
 (3) Conflict Resolution: As much as possible conflict resolution is made
